@@ -2,7 +2,7 @@ import {
   ViewPlugin, Decoration, EditorView, WidgetType,
   type DecorationSet, type ViewUpdate,
 } from '@codemirror/view'
-import { type Range, type Extension } from '@codemirror/state'
+import { type Range, type Extension, Facet } from '@codemirror/state'
 
 /**
  * Wikilink extension — renders [[links]] as styled clickable elements.
@@ -11,6 +11,11 @@ import { type Range, type Extension } from '@codemirror/state'
  */
 
 const WIKILINK_RE = /\[\[([^\]]+)\]\]/g
+
+/** Facet to provide the navigation callback to widgets */
+const wikilinkNavigate = Facet.define<(target: string) => void, (target: string) => void>({
+  combine: (values) => values[0] ?? (() => {}),
+})
 
 function isOnCursorLine(view: EditorView, from: number, to: number): boolean {
   for (const range of view.state.selection.ranges) {
@@ -24,16 +29,23 @@ function isOnCursorLine(view: EditorView, from: number, to: number): boolean {
 
 class WikilinkWidget extends WidgetType {
   title: string
-  constructor(title: string) {
+  navigate: (target: string) => void
+
+  constructor(title: string, navigate: (target: string) => void) {
     super()
     this.title = title
+    this.navigate = navigate
   }
 
   toDOM() {
     const span = document.createElement('span')
     span.className = 'cm-wikilink'
     span.textContent = this.title
-    span.dataset.wikilinkTarget = this.title
+    span.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      this.navigate(this.title)
+    })
     return span
   }
 
@@ -45,6 +57,7 @@ class WikilinkWidget extends WidgetType {
 function buildDecorations(view: EditorView): DecorationSet {
   const decs: Range<Decoration>[] = []
   const doc = view.state.doc.toString()
+  const navigate = view.state.facet(wikilinkNavigate)
 
   let match
   WIKILINK_RE.lastIndex = 0
@@ -57,7 +70,7 @@ function buildDecorations(view: EditorView): DecorationSet {
 
     // Replace [[title]] with styled widget
     decs.push(
-      Decoration.replace({ widget: new WikilinkWidget(title) }).range(from, to)
+      Decoration.replace({ widget: new WikilinkWidget(title, navigate) }).range(from, to)
     )
   }
 
@@ -101,21 +114,9 @@ const wikilinkTheme = EditorView.theme({
  * @param onNavigate Callback when a wikilink is clicked (receives the link title)
  */
 export function wikilinks(onNavigate: (target: string) => void): Extension {
-  // Use mousedown (not click) to catch the event before CM6 moves the cursor,
-  // which would remove the widget decoration and lose the click target.
-  const clickHandler = EditorView.domEventHandlers({
-    mousedown(event, _view) {
-      const el = event.target as HTMLElement
-      console.log('[wikilink] mousedown on:', el.className, el.textContent?.substring(0, 30))
-      if (el.classList.contains('cm-wikilink') && el.dataset.wikilinkTarget) {
-        event.preventDefault()
-        console.log('[wikilink] navigating to:', el.dataset.wikilinkTarget)
-        onNavigate(el.dataset.wikilinkTarget)
-        return true
-      }
-      return false
-    },
-  })
-
-  return [wikilinkPlugin, wikilinkTheme, clickHandler]
+  return [
+    wikilinkNavigate.of(onNavigate),
+    wikilinkPlugin,
+    wikilinkTheme,
+  ]
 }

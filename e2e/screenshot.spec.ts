@@ -82,10 +82,11 @@ test('wikilinks: rendered as styled elements and clickable', async ({ page }) =>
   // Screenshot showing wikilink rendered as styled text
   await page.screenshot({ path: 'test-results/wikilinks-styled.png', fullPage: true })
 
-  // Click the wikilink to navigate to Matteo Cellini
+  // Click the wikilink to navigate — use mouse.click to fire real mousedown
   const wikilink = page.locator('.cm-wikilink', { hasText: 'Matteo Cellini' })
-  if (await wikilink.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await wikilink.click()
+  const box = await wikilink.boundingBox()
+  if (box) {
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
     await page.waitForTimeout(500)
     // Should now have a new tab for Matteo Cellini
     await page.screenshot({ path: 'test-results/wikilinks-navigated.png', fullPage: true })
