@@ -6,6 +6,7 @@ import { BlockNoteView } from '@blocknote/mantine'
 import '@blocknote/mantine/style.css'
 import type { VaultEntry, GitCommit } from '../types'
 import { Inspector, type FrontmatterValue } from './Inspector'
+import { AIChatPanel } from './AIChatPanel'
 import { DiffView } from './DiffView'
 import { ResizeHandle } from './ResizeHandle'
 import { useEditorTheme } from '../hooks/useTheme'
@@ -52,6 +53,8 @@ interface EditorProps {
   onUpdateFrontmatter?: (path: string, key: string, value: FrontmatterValue) => Promise<void>
   onDeleteProperty?: (path: string, key: string) => Promise<void>
   onAddProperty?: (path: string, key: string, value: FrontmatterValue) => Promise<void>
+  showAIChat?: boolean
+  onToggleAIChat?: () => void
 }
 
 // --- Custom Inline Content: WikiLink ---
@@ -153,6 +156,7 @@ export const Editor = memo(function Editor({
   inspectorCollapsed, onToggleInspector, inspectorWidth, onInspectorResize,
   inspectorEntry, inspectorContent, allContent, gitHistory,
   onUpdateFrontmatter, onDeleteProperty, onAddProperty,
+  showAIChat, onToggleAIChat,
 }: EditorProps) {
   const [diffMode, setDiffMode] = useState(false)
   const [diffContent, setDiffContent] = useState<string | null>(null)
@@ -226,7 +230,9 @@ export const Editor = memo(function Editor({
         if (cache.has(activeTabPath)) {
           applyBlocks(cache.get(activeTabPath)!)
         } else {
-          const [, body] = splitFrontmatter(tab.content)
+          const [, rawBody] = splitFrontmatter(tab.content)
+          // Strip leading H1 title — it's already shown in the tab and breadcrumb
+          const body = rawBody.replace(/^# [^\n]*\n?/, '').trimStart()
           const preprocessed = preProcessWikilinks(body)
           const targetPath = activeTabPath
           // tryParseMarkdownToBlocks may return a Promise or blocks directly
@@ -400,7 +406,7 @@ export const Editor = memo(function Editor({
       }}
     >
       {/* Left: breadcrumb */}
-      <div className="flex items-center gap-1 text-xs">
+      <div className="flex items-center gap-1" style={{ fontSize: 12 }}>
         <span className="text-muted-foreground">{activeTab.entry.isA || 'Note'}</span>
         <span className="text-muted-foreground" style={{ margin: '0 2px' }}>&rsaquo;</span>
         <span className="font-medium text-foreground">{activeTab.entry.title}</span>
@@ -454,12 +460,15 @@ export const Editor = memo(function Editor({
           <CursorText size={16} />
         </button>
         <button
-          className="flex items-center justify-center border-none bg-transparent p-0 text-muted-foreground"
-          style={disabledIconStyle}
-          title="Coming soon"
-          tabIndex={-1}
+          className={cn(
+            "flex items-center justify-center border-none bg-transparent p-0 cursor-pointer transition-colors",
+            showAIChat ? "" : "text-muted-foreground hover:text-foreground"
+          )}
+          style={showAIChat ? { color: 'var(--primary)' } : undefined}
+          onClick={onToggleAIChat}
+          title={showAIChat ? 'Close AI Chat' : 'Open AI Chat'}
         >
-          <Sparkle size={16} />
+          <Sparkle size={16} weight={showAIChat ? 'fill' : 'regular'} />
         </button>
         <button
           className="flex items-center justify-center border-none bg-transparent p-0 text-muted-foreground"
@@ -473,7 +482,18 @@ export const Editor = memo(function Editor({
     </div>
   ) : null
 
-  const inspectorPanel = (
+  const rightPanel = showAIChat ? (
+    <div
+      className="shrink-0 flex flex-col min-h-0"
+      style={{ width: inspectorWidth, height: '100%' }}
+    >
+      <AIChatPanel
+        entry={inspectorEntry}
+        allContent={allContent}
+        onClose={() => onToggleAIChat?.()}
+      />
+    </div>
+  ) : (
     <div
       className="shrink-0 flex flex-col min-h-0"
       style={{ width: inspectorCollapsed ? 40 : inspectorWidth, height: '100%' }}
@@ -503,8 +523,8 @@ export const Editor = memo(function Editor({
             <p className="m-0 text-[15px]">Select a note to start editing</p>
             <span className="text-xs text-muted-foreground">Cmd+P to search &middot; Cmd+N to create</span>
           </div>
-          {!inspectorCollapsed && <ResizeHandle onResize={onInspectorResize} />}
-          {inspectorPanel}
+          {(showAIChat || !inspectorCollapsed) && <ResizeHandle onResize={onInspectorResize} />}
+          {rightPanel}
         </div>
       </div>
     )
@@ -547,8 +567,8 @@ export const Editor = memo(function Editor({
             </div>
           )}
         </div>
-        {!inspectorCollapsed && <ResizeHandle onResize={onInspectorResize} />}
-        {inspectorPanel}
+        {(showAIChat || !inspectorCollapsed) && <ResizeHandle onResize={onInspectorResize} />}
+        {rightPanel}
       </div>
     </div>
   )

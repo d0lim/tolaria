@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { NoteList } from './components/NoteList'
 import { Editor } from './components/Editor'
+import { AIChatPanel } from './components/AIChatPanel'
 import { ResizeHandle } from './components/ResizeHandle'
 import { CreateNoteDialog } from './components/CreateNoteDialog'
 import { QuickOpenPalette } from './components/QuickOpenPalette'
@@ -23,6 +24,7 @@ declare global {
 const DEFAULT_SELECTION: SidebarSelection = { kind: 'filter', filter: 'all' }
 
 const VAULTS = [
+  { label: 'Demo v2', path: '/Users/luca/Workspace/laputa-app/demo-vault-v2' },
   { label: 'Laputa', path: '/Users/luca/Laputa' },
   { label: 'Demo', path: '/Users/luca/Workspace/laputa-app/demo-vault' },
 ]
@@ -39,6 +41,7 @@ function App() {
   const [showCommitDialog, setShowCommitDialog] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [vaultPath, setVaultPath] = useState(VAULTS[0].path)
+  const [showAIChat, setShowAIChat] = useState(false)
 
   const vault = useVaultLoader(vaultPath)
   const notes = useNoteActions(vault.addEntry, vault.updateContent, vault.entries, setToastMessage)
@@ -142,6 +145,8 @@ function App() {
             onUpdateFrontmatter={notes.handleUpdateFrontmatter}
             onDeleteProperty={notes.handleDeleteProperty}
             onAddProperty={notes.handleAddProperty}
+            showAIChat={showAIChat}
+            onToggleAIChat={() => setShowAIChat(c => !c)}
           />
         </div>
       </div>
