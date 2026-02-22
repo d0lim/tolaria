@@ -8,13 +8,16 @@ import { QuickOpenPalette } from './components/QuickOpenPalette'
 import { Toast } from './components/Toast'
 import { CommitDialog } from './components/CommitDialog'
 import { StatusBar } from './components/StatusBar'
+import { SettingsPanel } from './components/SettingsPanel'
 import { useVaultLoader } from './hooks/useVaultLoader'
+import { useSettings } from './hooks/useSettings'
 import { useNoteActions, generateUntitledName } from './hooks/useNoteActions'
 import { useAppKeyboard } from './hooks/useAppKeyboard'
 import { useEntryActions } from './hooks/useEntryActions'
 import { isTauri } from './mock-tauri'
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation'
 import { useUpdater } from './hooks/useUpdater'
+import { setApiKey } from './utils/ai-chat'
 import type { SidebarSelection, GitCommit } from './types'
 import './App.css'
 
@@ -57,8 +60,16 @@ function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [vaultPath, setVaultPath] = useState(VAULTS[0].path)
   const [showAIChat, setShowAIChat] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const vault = useVaultLoader(vaultPath)
+  const { settings, saveSettings } = useSettings()
+
+  // Sync Anthropic key from settings to localStorage for AIChatPanel
+  useEffect(() => {
+    setApiKey(settings.anthropic_key ?? '')
+  }, [settings.anthropic_key])
+
   const notes = useNoteActions(vault.addEntry, vault.updateContent, vault.entries, setToastMessage)
 
   const entryActions = useEntryActions({
@@ -106,6 +117,7 @@ function App() {
     onQuickOpen: () => setShowQuickOpen(true),
     onCreateNote: handleCreateNoteImmediate,
     onSave: () => setToastMessage('Saved'),
+    onOpenSettings: () => setShowSettings(true),
     onTrashNote: entryActions.handleTrashNote,
     onArchiveNote: entryActions.handleArchiveNote,
     activeTabPathRef: notes.activeTabPathRef,
@@ -185,11 +197,12 @@ function App() {
           />
         </div>
       </div>
-      <StatusBar noteCount={vault.entries.length} vaultPath={vaultPath} vaults={VAULTS} onSwitchVault={handleSwitchVault} />
+      <StatusBar noteCount={vault.entries.length} vaultPath={vaultPath} vaults={VAULTS} onSwitchVault={handleSwitchVault} onOpenSettings={() => setShowSettings(true)} />
       <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
       <QuickOpenPalette open={showQuickOpen} entries={vault.entries} onSelect={notes.handleSelectNote} onClose={() => setShowQuickOpen(false)} />
       <CreateTypeDialog open={showCreateTypeDialog} onClose={() => setShowCreateTypeDialog(false)} onCreate={handleCreateType} />
       <CommitDialog open={showCommitDialog} modifiedCount={vault.modifiedFiles.length} onCommit={handleCommitPush} onClose={() => setShowCommitDialog(false)} />
+      <SettingsPanel open={showSettings} settings={settings} onSave={saveSettings} onClose={() => setShowSettings(false)} />
     </div>
   )
 }

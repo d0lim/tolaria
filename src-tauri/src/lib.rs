@@ -1,10 +1,12 @@
 pub mod ai_chat;
 pub mod frontmatter;
 pub mod git;
+pub mod settings;
 pub mod vault;
 
 use ai_chat::{AiChatRequest, AiChatResponse};
 use git::{GitCommit, ModifiedFile};
+use settings::Settings;
 use vault::{VaultEntry, RenameResult};
 use frontmatter::FrontmatterValue;
 
@@ -78,6 +80,16 @@ fn purge_trash(vault_path: String) -> Result<Vec<String>, String> {
     vault::purge_trash(&vault_path)
 }
 
+#[tauri::command]
+fn get_settings() -> Result<Settings, String> {
+    settings::get_settings()
+}
+
+#[tauri::command]
+fn save_settings(settings: Settings) -> Result<(), String> {
+    settings::save_settings(settings)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -128,7 +140,9 @@ pub fn run() {
             git_push,
             ai_chat,
             save_image,
-            purge_trash
+            purge_trash,
+            get_settings,
+            save_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

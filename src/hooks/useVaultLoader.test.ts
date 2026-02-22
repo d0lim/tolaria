@@ -46,7 +46,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 vi.mock('../mock-tauri', () => ({
   isTauri: () => false,
-  mockInvoke: (...args: any[]) => mockInvokeFn(...args),
+  mockInvoke: (cmd: string, args?: any) => mockInvokeFn(cmd, args),
 }))
 
 describe('useVaultLoader', () => {
@@ -164,13 +164,13 @@ describe('useVaultLoader', () => {
     })
 
     it('returns empty array on error', async () => {
-      mockInvokeFn.mockImplementation((cmd: string) => {
+      mockInvokeFn.mockImplementation(((cmd: string) => {
         if (cmd === 'get_file_history') return Promise.reject(new Error('fail'))
         if (cmd === 'list_vault') return Promise.resolve([])
         if (cmd === 'get_all_content') return Promise.resolve({})
         if (cmd === 'get_modified_files') return Promise.resolve([])
         return Promise.resolve(null)
-      })
+      }) as any)
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const { result } = renderHook(() => useVaultLoader('/vault'))

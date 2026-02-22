@@ -1,35 +1,47 @@
-# Rename Note Tab — Done Summary
+# Settings Panel — AI Provider Keys + Local Config Storage
 
 ## What was built
-Double-click a tab title to rename the note. The tab shows an inline text input (Enter saves, Escape cancels). Renaming updates the note's title, filename, H1 heading, frontmatter `title:` field, and all wiki links (`[[OldName]]` → `[[NewName]]`) across the entire vault.
 
-## Commits on `task/rename-note-tab`
-1. `caa26b6` — design: rename-note-tab wireframes (`design/rename-note-tab.pen`)
-2. `68dfab4` — feat: add `rename_note` Tauri command with wiki link updates (Rust backend)
-3. `5a8eb6a` — feat: rename note via double-click on tab — frontend wiring
-4. `ee00c2c` — test: Playwright e2e tests for rename tab feature
+### Rust Backend (`src-tauri/src/settings.rs`)
+- `Settings` struct: `{ anthropic_key, openai_key, google_key }` as `Option<String>`
+- `get_settings()` — reads from `<app_config_dir>/settings.json`, returns defaults if missing
+- `save_settings()` — writes JSON, trims whitespace, converts empty strings to `None`
+- Registered as Tauri commands in `lib.rs`
 
-## Architecture decisions
-- **Slug generation**: title → lowercase, non-alphanumeric chars replaced with hyphens, leading/trailing hyphens stripped. Same logic in Rust backend and TypeScript mock.
-- **Wiki link matching**: regex matches both title-based (`[[Old Title]]`) and path-stem-based (`[[note/old-title]]`) references, preserving pipe aliases (`[[Old Title|display]]` → `[[New Title|display]]`).
-- **State flow**: `onRenameTab` flows from TabBar → Editor → App → `useNoteActions.handleRenameNote` → Tauri backend → `useVaultLoader.replaceEntry` (updates entries + allContent atomically).
-- **H1 + frontmatter**: The rename updates both the first `# Heading` line and the `title:` frontmatter field if present.
-- **Toast feedback**: Shows "Renamed" or "Renamed — updated N wiki links" on success, "Failed to rename note" on error.
+### Frontend Hook (`src/hooks/useSettings.ts`)
+- `useSettings()` — loads settings on mount, exposes `settings`, `loaded`, `saveSettings`
+- Uses the standard `tauriCall` pattern (Tauri invoke or mock fallback)
 
-## Code health
-- **TabBar.tsx**: Improved from CC 23→18 by extracting `TabItem` component and `tabStyle` helper.
-- **Rust `vault.rs`**: Passed code health after extracting helpers (`build_wikilink_pattern`, `WikilinkReplacement` struct, `collect_md_files`, etc.) to keep CC under thresholds.
-- **useNoteActions.ts**: Pre-existing CC=37 (threshold 9) increased to 42. Extracted `performRename` and `buildRenamedEntry` as module-level functions. Proper fix requires splitting the monolithic hook (separate concern).
-- **App.tsx / useVaultLoader.ts**: Minor LOC/CC increases on already-above-threshold functions.
+### Settings Panel (`src/components/SettingsPanel.tsx`)
+- Modal with 3 API key fields (Anthropic, OpenAI, Google AI)
+- Password-type inputs with reveal/hide toggle and clear button
+- Saves on button click or Cmd+Enter, closes on Escape or backdrop click
+- Trims whitespace, converts empty to null before saving
+- Footer shows "⌘, to open settings" hint
 
-## Test results
-- `pnpm test` — 119/119 passed
-- `cargo test` — 147/147 passed (including 7 new rename tests)
-- `npx vite build` — success
-- Playwright e2e — 2/2 rename-tab tests pass
+### Integration
+- **StatusBar**: Gear icon now clickable (was disabled), opens Settings panel
+- **useAppKeyboard**: Cmd+, shortcut opens Settings
+- **AIChatPanel**: Anthropic key synced from settings to localStorage via `useEffect` in App.tsx
+- **mock-tauri.ts**: Added `get_settings` / `save_settings` mock handlers
 
-## Visual verification
-Tested on `localhost:5173` via Playwright:
-- Double-click → inline input appears with current title selected
-- Type new name → Enter → tab title updates, note list updates, breadcrumb updates, toast shows "Renamed"
-- Double-click → type → Escape → title reverts, no changes made
+### Design
+- `design/settings-panel.pen` — Settings modal wireframe with header, 3 key fields, footer
+
+### Tests (19 new tests)
+- `SettingsPanel.test.tsx` — 14 tests: render, save, clear, keyboard, backdrop
+- `useSettings.test.ts` — 5 tests: load, save, error handling
+- Updated `App.test.tsx` with settings command mocks
+
+## Product Decisions
+- Keys stored via Tauri app config dir (not localStorage) for persistence across sessions
+- Anthropic key synced to localStorage so existing AIChatPanel code works unchanged
+- All 3 provider key fields shown even though only Anthropic is currently used (ready for future)
+- Settings modal pattern matches existing app modals (CommitDialog, CreateTypeDialog)
+
+## Verification
+- `pnpm test` — 386 tests pass
+- `pnpm test:coverage` — 81.78% stmts, 84.28% lines (threshold: 70%)
+- `cargo test` — 152 tests pass
+- `cargo llvm-cov --lib --fail-under-lines 85` — 87.28% line coverage
+- `pnpm build` — succeeds

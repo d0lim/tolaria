@@ -53,10 +53,21 @@ vi.mock('./mock-tauri', () => ({
     if (cmd === 'get_modified_files') return []
     if (cmd === 'get_note_content') return mockAllContent['/vault/project/test.md'] || ''
     if (cmd === 'get_file_history') return []
+    if (cmd === 'get_settings') return { anthropic_key: null, openai_key: null, google_key: null }
+    if (cmd === 'save_settings') return null
     return null
   }),
   addMockEntry: vi.fn(),
   updateMockContent: vi.fn(),
+}))
+
+// Mock ai-chat utilities (uses localStorage which may not be available in jsdom)
+vi.mock('./utils/ai-chat', () => ({
+  setApiKey: vi.fn(),
+  getApiKey: vi.fn(() => ''),
+  MODEL_OPTIONS: [{ value: 'claude-3-5-haiku-20241022', label: 'Haiku 3.5' }],
+  buildSystemPrompt: vi.fn(() => ({ prompt: '', totalTokens: 0, truncated: false })),
+  streamChat: vi.fn(),
 }))
 
 // Mock BlockNote components (they need DOM APIs not available in jsdom)

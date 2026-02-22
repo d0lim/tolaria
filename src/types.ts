@@ -40,6 +40,12 @@ export interface ModifiedFile {
   status: 'modified' | 'added' | 'deleted' | 'untracked' | 'renamed'
 }
 
+export interface Settings {
+  anthropic_key: string | null
+  openai_key: string | null
+  google_key: string | null
+}
+
 export type SidebarSelection =
   | { kind: 'filter'; filter: 'all' | 'favorites' | 'archived' | 'trash' }
   | { kind: 'sectionGroup'; type: string }

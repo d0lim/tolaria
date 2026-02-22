@@ -4,7 +4,7 @@
  * this provides realistic test data so the UI can be verified visually.
  */
 
-import type { VaultEntry, GitCommit, ModifiedFile } from './types'
+import type { VaultEntry, GitCommit, ModifiedFile, Settings } from './types'
 
 // --- Vault API detection (for reading real files in browser dev mode) ---
 let vaultApiAvailable: boolean | null = null
@@ -1641,6 +1641,12 @@ index abc1234..${shortHash} 100644
 
 let mockHasChanges = true
 
+let mockSettings: Settings = {
+  anthropic_key: null,
+  openai_key: null,
+  google_key: null,
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock handler map accepts heterogeneous arg types
 const mockHandlers: Record<string, (args: any) => any> = {
   list_vault: () => MOCK_ENTRIES,
@@ -1679,6 +1685,16 @@ const mockHandlers: Record<string, (args: any) => any> = {
     const vault = args.vault_path ?? '/Users/luca/Laputa'
     const timestamp = Date.now()
     return `${vault}/attachments/${timestamp}-${args.filename}`
+  },
+  get_settings: () => ({ ...mockSettings }),
+  save_settings: (args: { settings: Settings }) => {
+    const s = args.settings
+    mockSettings = {
+      anthropic_key: s.anthropic_key?.trim() || null,
+      openai_key: s.openai_key?.trim() || null,
+      google_key: s.google_key?.trim() || null,
+    }
+    return null
   },
   rename_note: (args: { vault_path: string; old_path: string; new_title: string }) => {
     const oldContent = MOCK_CONTENT[args.old_path] ?? ''
