@@ -1,11 +1,13 @@
 mod cache;
 mod image;
+mod migration;
 mod parsing;
 mod rename;
 mod trash;
 
 pub use cache::scan_vault_cached;
 pub use image::save_image;
+pub use migration::migrate_is_a_to_type;
 pub use rename::{rename_note, RenameResult};
 pub use trash::purge_trash;
 
