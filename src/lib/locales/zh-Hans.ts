@@ -151,6 +151,8 @@ export const ZH_HANS_TRANSLATIONS = {
   'sidebar.nav.inbox': '收件箱',
   'sidebar.nav.allNotes': '全部笔记',
   'sidebar.nav.archive': '归档',
+  'sidebar.nav.back': '后退',
+  'sidebar.nav.forward': '前进',
   'sidebar.group.favorites': '收藏',
   'sidebar.group.views': '视图',
   'sidebar.group.types': '类型',

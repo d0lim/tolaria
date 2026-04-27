@@ -149,6 +149,8 @@ export const EN_TRANSLATIONS = {
   'sidebar.nav.inbox': 'Inbox',
   'sidebar.nav.allNotes': 'All Notes',
   'sidebar.nav.archive': 'Archive',
+  'sidebar.nav.back': 'Back',
+  'sidebar.nav.forward': 'Forward',
   'sidebar.group.favorites': 'FAVORITES',
   'sidebar.group.views': 'VIEWS',
   'sidebar.group.types': 'TYPES',
