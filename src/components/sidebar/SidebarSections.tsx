@@ -250,7 +250,7 @@ export function SidebarTitleBar({
   return (
     <TooltipProvider>
       <div
-        className="shrink-0 flex items-center justify-between border-b border-border"
+        className="shrink-0 flex items-center justify-end gap-2 border-b border-border"
         style={{ height: 52, padding: '0 8px', paddingLeft: 80, cursor: 'default' }}
         onMouseDown={onMouseDown}
       >
