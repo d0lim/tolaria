@@ -283,7 +283,14 @@ export const Sidebar = memo(function Sidebar({
 
   return (
     <aside className="flex h-full flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-sidebar text-sidebar-foreground">
-      <SidebarTitleBar locale={locale} onCollapse={onCollapse} />
+      <SidebarTitleBar
+        locale={locale}
+        onCollapse={onCollapse}
+        canGoBack={false}
+        canGoForward={false}
+        onGoBack={() => {}}
+        onGoForward={() => {}}
+      />
       <SidebarNavigation
         entries={entries}
         selection={selection}
