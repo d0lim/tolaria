@@ -28,8 +28,8 @@ describe('SidebarNavArrows', () => {
     expect(screen.getByRole('button', { name: 'Forward' })).toBeTruthy()
   })
 
-  it('renders Simplified Chinese aria-labels when locale=zh-Hans', () => {
-    renderArrows({ locale: 'zh-Hans' })
+  it('renders Simplified Chinese aria-labels when locale=zh-CN', () => {
+    renderArrows({ locale: 'zh-CN' })
     expect(screen.getByRole('button', { name: '后退' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '前进' })).toBeTruthy()
   })

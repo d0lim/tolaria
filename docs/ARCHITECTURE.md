@@ -32,7 +32,7 @@ Examples:
 - ✅ Vault: `_pinned_properties` in a Type note (every device should show the same pinned properties)
 - ✅ Vault: `_icon: shapes` in a Type note (icon is part of the type's identity)
 - ✅ App settings: `zoom: 1.3` (machine-specific preference)
-- ✅ App settings: `ui_language: "zh-Hans"` (installation-specific UI language)
+- ✅ App settings: `ui_language: "zh-CN"` (installation-specific UI language)
 
 ### No hardcoded exceptions
 
@@ -100,7 +100,7 @@ flowchart LR
 | Frontmatter parsing | gray_matter | 0.2 |
 | AI (agent panel) | CLI agent adapters (Claude Code + Codex) | - |
 | Search | Keyword (walkdir-based file scan) | - |
-| Localization | App-owned dictionary (`src/lib/i18n.ts`) | English fallback + `zh-Hans` |
+| Localization | App-owned runtime + JSON catalogs (`src/lib/i18n.ts`, `src/lib/locales/*.json`, `lara.yaml`) | English fallback + Lara CLI sync |
 | MCP | @modelcontextprotocol/sdk | 1.0 |
 | Tests | Vitest (unit), Playwright (E2E/smoke), cargo test (Rust) | - |
 | Package manager | pnpm | - |
@@ -218,7 +218,7 @@ Full agent mode — spawns the selected local CLI agent as a subprocess with too
 
 1. **Frontend** (`AiPanel` + `useCliAiAgent` + `aiAgents.ts`) — streaming UI with reasoning blocks, tool action cards, response display, onboarding, and default-agent selection
 2. **Backend** (`ai_agents.rs`) — normalizes agent availability and streaming, dispatching to per-agent adapters
-3. **Agent adapters** — Claude Code still uses `claude_cli.rs`; Codex runs through `codex exec --json` with the CLI's normal approval / sandbox defaults
+3. **Agent adapters** — Claude Code still uses `claude_cli.rs` with `acceptEdits`, strict Tolaria MCP config, and a file/search-only built-in tool list; Codex runs through `codex --sandbox workspace-write --ask-for-approval never exec --json`. Both app-launched paths can edit the active vault without enabling dangerous permission bypass modes.
 4. **MCP Integration** — Claude receives the generated MCP config file path, while Codex receives the same Tolaria MCP server via transient `-c mcp_servers.tolaria.*` config overrides
 
 CLI-agent availability intentionally does not depend only on the desktop app's inherited `PATH`. The detectors check the current process path, the user's login shell, and supported local/toolchain install locations such as native `~/.local/bin`, local `~/.claude/local`, Mise/asdf shims, npm-global, Homebrew, Windows `%APPDATA%\npm`/pnpm/Scoop shims, Windows `.exe` launchers, and the macOS Codex app resource path so first-run onboarding works on fresh macOS and Windows installs.
@@ -420,7 +420,7 @@ The app uses internal app-owned light and dark themes (see [ADR-0081](adr/0081-i
 
 ## Localization
 
-Tolaria's app chrome uses an app-owned localization layer in `src/lib/i18n.ts` (see [ADR-0084](adr/0084-app-localization-foundation.md)). English is the canonical fallback, and Simplified Chinese (`zh-Hans`) is the first additional locale. The installation-local `ui_language` setting stores an explicit locale when the user chooses one; `null` means "follow the system language when Tolaria supports it, otherwise English." Missing translation keys fall back to English so partially translated locales do not render broken placeholders.
+Tolaria's app chrome uses an app-owned localization runtime in `src/lib/i18n.ts`, backed by flat JSON catalogs in `src/lib/locales/` and Lara CLI synchronization through `lara.yaml` (see [ADR-0087](adr/0087-json-catalogs-and-lara-cli-localization.md)). `en.json` is the canonical source catalog, locale files are one file per locale, and English remains the fallback for any missing locale file or key. The installation-local `ui_language` setting stores an explicit locale when the user chooses one; `null` means "follow the system language when Tolaria supports it, otherwise English." Legacy stored values such as `zh-Hans` are normalized to canonical locale codes like `zh-CN`.
 
 `App.tsx` derives the effective locale from settings and browser/system language hints, then passes it down to localized surfaces. Settings exposes a keyboard-accessible shadcn `Select`, and the command palette includes actions to open language settings or switch directly to a supported language.
 
@@ -908,7 +908,7 @@ sequenceDiagram
     App->>User: TelemetryConsentDialog
     alt Accept
         User->>Settings: telemetry_consent=true, anonymous_id=UUID
-        Settings->>Sentry: init(DSN, anonymous_id)
+        Settings->>Sentry: init(DSN, release, anonymous_id)
         Settings->>PostHog: init(key, anonymous_id)
     else Decline
         User->>Settings: telemetry_consent=false
@@ -930,6 +930,7 @@ sequenceDiagram
 **Architecture:**
 - **Rust:** `sentry` crate initialized in `lib.rs::setup()` via `telemetry::init_sentry_from_settings()`
 - **JS:** `@sentry/react` + `posthog-js` initialized lazily by `useTelemetry` hook; the React root also wires `onCaughtError`, `onUncaughtError`, and `onRecoverableError` through `Sentry.reactErrorHandler()` so production React invariants include component stack context when crash reporting is enabled.
+- **Release grouping:** packaged release workflows pass `VITE_SENTRY_RELEASE` from the computed build version so frontend Sentry events group by the shipped alpha or stable version.
 - **Settings:** `telemetry_consent`, `crash_reporting_enabled`, `analytics_enabled`, `anonymous_id` in `Settings` struct
 - **Consent:** `TelemetryConsentDialog` shown when `telemetry_consent === null`
 

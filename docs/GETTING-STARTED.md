@@ -157,7 +157,8 @@ tolaria/
 │   ├── lib/
 │   │   ├── aiAgents.ts           # Shared agent registry + status helpers
 │   │   ├── appUpdater.ts         # Frontend wrapper around channel-aware updater commands
-│   │   ├── i18n.ts               # App-owned localization dictionary and locale resolution
+│   │   ├── i18n.ts               # App-owned localization runtime and locale resolution
+│   │   ├── locales/              # JSON locale catalogs (English source + translated locales)
 │   │   ├── releaseChannel.ts     # Alpha/stable normalization helpers
 │   │   └── utils.ts              # Tailwind merge + cn() helper
 │   │
@@ -212,6 +213,7 @@ tolaria/
 ├── scripts/                      # Build/utility scripts
 │
 ├── package.json                  # Frontend dependencies + scripts
+├── lara.yaml                     # Lara CLI locale sync configuration
 ├── vite.config.ts                # Vite bundler config
 ├── tsconfig.json                 # TypeScript config
 ├── playwright.config.ts          # Full Playwright regression config
@@ -415,5 +417,5 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 1. **Agent system prompt**: Edit `src/utils/ai-agent.ts` (inline system prompt string)
 2. **Context building**: Edit `src/utils/ai-context.ts` for what data is sent to the agent
 3. **Tool action display**: Edit `src/components/AiActionCard.tsx`
-4. **Claude CLI arguments**: Edit `src-tauri/src/claude_cli.rs` (`run_agent_stream()`)
-5. **Shared agent adapters / Codex args**: Edit `src-tauri/src/ai_agents.rs` (keep Codex on the normal approval/sandbox path unless you are intentionally designing an advanced mode)
+4. **Claude CLI arguments**: Edit `src-tauri/src/claude_cli.rs` (`run_agent_stream()`; keep app-managed launches on strict Tolaria MCP config, `acceptEdits`, and the scoped file/search tool list)
+5. **Shared agent adapters / Codex args**: Edit `src-tauri/src/ai_agents.rs` (keep Codex sandboxed with active-vault `workspace-write`; do not use the dangerous bypass unless an ADR explicitly designs a new mode)
