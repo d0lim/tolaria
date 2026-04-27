@@ -55,6 +55,10 @@ interface SidebarProps {
   inboxCount?: number
   locale?: AppLocale
   onCollapse?: () => void
+  canGoBack: boolean
+  canGoForward: boolean
+  onGoBack: () => void
+  onGoForward: () => void
 }
 
 interface SidebarNavigationProps extends Pick<
@@ -245,6 +249,10 @@ export const Sidebar = memo(function Sidebar({
   locale = 'en',
   onCollapse,
   onCreateNewType,
+  canGoBack,
+  canGoForward,
+  onGoBack,
+  onGoForward,
 }: SidebarProps) {
   const { typeEntryMap, allSectionGroups, visibleSections, sectionIds } = useSidebarSections(entries)
   const { activeCount, archivedCount } = useEntryCounts(entries)
@@ -286,10 +294,10 @@ export const Sidebar = memo(function Sidebar({
       <SidebarTitleBar
         locale={locale}
         onCollapse={onCollapse}
-        canGoBack={false}
-        canGoForward={false}
-        onGoBack={() => {}}
-        onGoForward={() => {}}
+        canGoBack={canGoBack}
+        canGoForward={canGoForward}
+        onGoBack={onGoBack}
+        onGoForward={onGoForward}
       />
       <SidebarNavigation
         entries={entries}
