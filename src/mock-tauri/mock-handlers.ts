@@ -378,6 +378,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   get_ai_agents_status: () => ({
     claude_code: { installed: false, version: null },
     codex: { installed: false, version: null },
+    opencode: { installed: false, version: null },
+    pi: { installed: false, version: null },
   }),
   get_vault_ai_guidance_status: () => ({ ...mockVaultAiGuidanceStatus }),
   restore_vault_ai_guidance: () => {
@@ -389,7 +391,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     return { ...mockVaultAiGuidanceStatus }
   },
   stream_claude_chat: () => 'mock-session',
-  stream_claude_agent: () => null,
   stream_ai_agent: () => null,
   save_note_content: (args: { path: string; content: string }) => {
     MOCK_CONTENT[args.path] = args.content
@@ -485,6 +486,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   },
   register_mcp_tools: () => 'registered',
   check_mcp_status: () => 'installed',
+  sync_mcp_bridge_vault: (args: { vaultPath?: string | null }) => args.vaultPath ? 'started' : 'stopped',
   repair_vault: (): string => {
     mockVaultAiGuidanceStatus = {
       agents_state: 'managed',

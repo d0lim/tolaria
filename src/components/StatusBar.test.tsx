@@ -19,6 +19,8 @@ const vaults: VaultOption[] = [
 const installedAiAgentsStatus = {
   claude_code: { status: 'installed' as const, version: '1.0.20' },
   codex: { status: 'installed' as const, version: '0.37.0' },
+  opencode: { status: 'installed' as const, version: '0.3.1' },
+  pi: { status: 'installed' as const, version: '0.70.2' },
 }
 
 const DEFAULT_WINDOW_WIDTH = 1280
@@ -83,6 +85,11 @@ describe('StatusBar', () => {
   it('displays fallback build number when not provided', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} />)
     expect(screen.getByText('b?')).toBeInTheDocument()
+  })
+
+  it('shows the vault reload badge while a reload is active', () => {
+    render(<StatusBar noteCount={100} vaultPath="/Users/luca/Laputa" vaults={vaults} onSwitchVault={vi.fn()} isVaultReloading />)
+    expect(screen.getByTestId('status-vault-reloading')).toHaveAccessibleName('Reloading vault from disk')
   })
 
   it('calls onCheckForUpdates when clicking build number', () => {

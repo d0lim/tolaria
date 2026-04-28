@@ -4,14 +4,15 @@ import {
   appendStreamingMessage,
   buildFormattedMessage,
   createMissingAgentResponse,
+  type AgentStatus,
   type AgentExecutionContext,
   type AiAgentMessage,
   type PendingUserPrompt,
 } from './aiAgentConversation'
+import type { AgentFileCallbacks } from './aiAgentFileOperations'
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
 import type { ToolInvocation } from './aiAgentMessageState'
 import { streamAiAgent } from '../utils/streamAiAgent'
-import type { AgentFileCallbacks, AgentStatus } from '../hooks/useAiAgent'
 
 export interface AiAgentSessionRuntime {
   setMessages: Dispatch<SetStateAction<AiAgentMessage[]>>
@@ -80,6 +81,7 @@ export async function sendAgentMessage({
     systemPrompt,
     vaultPath: context.vaultPath,
     callbacks: createStreamCallbacks({
+      agent: context.agent,
       messageId,
       vaultPath: context.vaultPath,
       setMessages: runtime.setMessages,

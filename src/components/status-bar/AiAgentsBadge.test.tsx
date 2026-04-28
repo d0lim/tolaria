@@ -12,6 +12,8 @@ vi.mock('../../utils/url', async () => {
 const installedStatuses = {
   claude_code: { status: 'installed' as const, version: '1.0.20' },
   codex: { status: 'installed' as const, version: '0.37.0' },
+  opencode: { status: 'installed' as const, version: '0.3.1' },
+  pi: { status: 'installed' as const, version: '0.70.2' },
 }
 
 function render(ui: ReactElement) {
@@ -21,6 +23,30 @@ function render(ui: ReactElement) {
 describe('AiAgentsBadge', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('keeps the dropdown trigger off the Radix tooltip popper path', () => {
+    render(
+      <AiAgentsBadge
+        statuses={installedStatuses}
+        defaultAgent="claude_code"
+        onSetDefaultAgent={vi.fn()}
+      />,
+    )
+
+    const trigger = screen.getByTestId('status-ai-agents')
+    expect(trigger).toHaveAttribute('data-tooltip-mode', 'native-title')
+    expect(trigger.getAttribute('title')).toContain('Claude Code')
+
+    act(() => {
+      trigger.focus()
+    })
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+    act(() => {
+      fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    })
+    expect(screen.getByTestId('status-ai-agents-menu')).toBeInTheDocument()
   })
 
   it('shows the vault guidance summary and restore action', async () => {

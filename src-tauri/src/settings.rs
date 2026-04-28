@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 const APP_CONFIG_DIR: &str = "com.tolaria.app";
 const LEGACY_APP_CONFIG_DIR: &str = "com.laputa.app";
+const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &["claude_code", "codex", "opencode", "pi"];
+pub const DEFAULT_HIDE_GITIGNORED_FILES: bool = true;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Settings {
@@ -21,6 +23,7 @@ pub struct Settings {
     pub ui_language: Option<String>,
     pub initial_h1_auto_rename_enabled: Option<bool>,
     pub default_ai_agent: Option<String>,
+    pub hide_gitignored_files: Option<bool>,
 }
 
 fn normalize_optional_string(value: Option<String>) -> Option<String> {
@@ -50,7 +53,7 @@ pub fn effective_release_channel(value: Option<&str>) -> &'static str {
 
 pub fn normalize_default_ai_agent(value: Option<&str>) -> Option<String> {
     match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
-        Some(agent) if agent == "claude_code" || agent == "codex" => Some(agent),
+        Some(agent) if SUPPORTED_DEFAULT_AI_AGENTS.contains(&agent.as_str()) => Some(agent),
         _ => None,
     }
 }
@@ -60,6 +63,18 @@ pub fn normalize_theme_mode(value: Option<&str>) -> Option<String> {
         Some(mode) if mode == "light" || mode == "dark" => Some(mode),
         _ => None,
     }
+}
+
+pub fn should_hide_gitignored_files(settings: &Settings) -> bool {
+    settings
+        .hide_gitignored_files
+        .unwrap_or(DEFAULT_HIDE_GITIGNORED_FILES)
+}
+
+pub fn hide_gitignored_files_enabled() -> bool {
+    get_settings()
+        .map(|settings| should_hide_gitignored_files(&settings))
+        .unwrap_or(DEFAULT_HIDE_GITIGNORED_FILES)
 }
 
 fn canonical_language_code(value: &str) -> Option<String> {
@@ -110,6 +125,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         ui_language: normalize_ui_language(settings.ui_language.as_deref()),
         initial_h1_auto_rename_enabled: settings.initial_h1_auto_rename_enabled,
         default_ai_agent: normalize_default_ai_agent(settings.default_ai_agent.as_deref()),
+        hide_gitignored_files: settings.hide_gitignored_files,
     }
 }
 
@@ -252,6 +268,7 @@ mod tests {
             ui_language: Some("zh-Hans".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
+            hide_gitignored_files: Some(false),
         };
         let json = serde_json::to_string(&settings).unwrap();
         let parsed: Settings = serde_json::from_str(&json).unwrap();
@@ -279,6 +296,7 @@ mod tests {
             ui_language: Some("zh-Hans".to_string()),
             initial_h1_auto_rename_enabled: Some(false),
             default_ai_agent: Some("codex".to_string()),
+            hide_gitignored_files: Some(false),
             ..Default::default()
         });
         assert_eq!(loaded.auto_pull_interval_minutes, Some(10));
@@ -291,6 +309,20 @@ mod tests {
         assert_eq!(loaded.ui_language.as_deref(), Some("zh-Hans"));
         assert_eq!(loaded.initial_h1_auto_rename_enabled, Some(false));
         assert_eq!(loaded.default_ai_agent.as_deref(), Some("codex"));
+        assert_eq!(loaded.hide_gitignored_files, Some(false));
+    }
+
+    #[test]
+    fn test_gitignored_files_are_hidden_by_default() {
+        assert!(should_hide_gitignored_files(&Settings::default()));
+        assert!(should_hide_gitignored_files(&Settings {
+            hide_gitignored_files: Some(true),
+            ..Default::default()
+        }));
+        assert!(!should_hide_gitignored_files(&Settings {
+            hide_gitignored_files: Some(false),
+            ..Default::default()
+        }));
     }
 
     #[test]
@@ -346,6 +378,24 @@ mod tests {
             ..Default::default()
         });
         assert!(loaded.default_ai_agent.is_none());
+    }
+
+    #[test]
+    fn test_opencode_default_ai_agent_is_preserved() {
+        let loaded = save_and_reload(Settings {
+            default_ai_agent: Some("opencode".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("opencode"));
+    }
+
+    #[test]
+    fn test_pi_default_ai_agent_is_preserved() {
+        let loaded = save_and_reload(Settings {
+            default_ai_agent: Some("pi".to_string()),
+            ..Default::default()
+        });
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("pi"));
     }
 
     #[test]

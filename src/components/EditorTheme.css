@@ -29,6 +29,10 @@
   gap: 0 !important;
 }
 
+.editor__blocknote-container .bn-side-menu [draggable="true"] * {
+  pointer-events: none;
+}
+
 /* More horizontal space between drag handle and content */
 .editor__blocknote-container .bn-side-menu ~ * ,
 .editor__blocknote-container [class*="bn-side-menu"] {
@@ -266,6 +270,110 @@
 .editor__blocknote-container .math .katex-error {
   color: var(--destructive) !important;
   white-space: pre-wrap;
+}
+
+.editor__blocknote-container .mermaid-diagram {
+  position: relative;
+  width: 100%;
+  margin: 10px 0;
+  color: var(--colors-text);
+}
+
+.editor__blocknote-container .mermaid-diagram__viewport {
+  max-width: 100%;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--surface-editor);
+}
+
+.editor__blocknote-container .mermaid-diagram__expand-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  opacity: 0;
+  background: var(--surface-editor);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 0.14);
+}
+
+.editor__blocknote-container .mermaid-diagram:is(:hover, :focus-within) .mermaid-diagram__expand-button {
+  opacity: 1;
+}
+
+.editor__blocknote-container .mermaid-diagram__viewport:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.editor__blocknote-container .mermaid-diagram__viewport svg {
+  display: block;
+  max-width: none;
+  min-width: min-content;
+  height: auto;
+  margin: 0 auto;
+}
+
+@media (hover: none) {
+  .editor__blocknote-container .mermaid-diagram__expand-button {
+    opacity: 1;
+  }
+}
+
+.mermaid-diagram__dialog {
+  width: calc(100vw - 32px);
+  max-width: calc(100vw - 32px);
+  height: calc(100dvh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  padding: 0;
+}
+
+.mermaid-diagram__dialog-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  padding: 24px;
+  background: #fff;
+}
+
+.mermaid-diagram__dialog-viewport:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+.mermaid-diagram__dialog-viewport svg {
+  display: block;
+  max-width: none;
+  min-width: min-content;
+  height: auto;
+  margin: auto;
+}
+
+.editor__blocknote-container .mermaid-diagram--error {
+  padding: 12px;
+  border: 1px solid var(--destructive);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+.editor__blocknote-container .mermaid-diagram--error figcaption {
+  margin-bottom: 8px;
+  color: var(--destructive);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.editor__blocknote-container .mermaid-diagram--error pre {
+  max-width: 100%;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--inline-styles-code-background-color);
+  color: var(--inline-styles-code-color);
+  font-size: 0.85rem;
 }
 
 .editor__blocknote-container[data-follow-links] .bn-editor a,

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{ExitStatus, Stdio};
 
 /// Status returned by `check_claude_cli`.
 #[derive(Debug, Serialize, Clone)]
@@ -50,7 +50,7 @@ pub struct ChatStreamRequest {
     pub session_id: Option<String>,
 }
 
-/// Parameters accepted by `stream_claude_agent`.
+/// Parameters accepted by Claude Code agent streams.
 #[derive(Debug, Deserialize)]
 pub struct AgentStreamRequest {
     pub message: String,
@@ -79,7 +79,7 @@ pub(crate) fn find_claude_binary() -> Result<PathBuf, String> {
 }
 
 fn find_claude_binary_on_path() -> Option<PathBuf> {
-    Command::new(claude_path_lookup_command())
+    crate::hidden_command(claude_path_lookup_command())
         .arg("claude")
         .output()
         .ok()
@@ -114,7 +114,7 @@ fn user_shell_candidates() -> Vec<PathBuf> {
 }
 
 fn command_path_from_shell(shell: &Path, command: &str) -> Option<PathBuf> {
-    Command::new(shell)
+    crate::hidden_command(shell)
         .arg("-lc")
         .arg(format!("command -v {command}"))
         .output()
@@ -193,7 +193,7 @@ pub fn check_cli() -> ClaudeCliStatus {
         }
     };
 
-    let version = Command::new(&bin)
+    let version = crate::hidden_command(&bin)
         .arg("--version")
         .output()
         .ok()
@@ -327,14 +327,7 @@ fn run_claude_subprocess<F>(
 where
     F: FnMut(ClaudeStreamEvent),
 {
-    let mut cmd = Command::new(bin);
-    cmd.args(args)
-        .env_remove("CLAUDECODE") // prevent "nested session" guard
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    if let Some(dir) = cwd {
-        cmd.current_dir(dir);
-    }
+    let mut cmd = build_claude_command(bin, args, cwd);
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn claude: {e}"))?;
@@ -389,6 +382,23 @@ where
     emit(ClaudeStreamEvent::Done);
 
     Ok(state.session_id)
+}
+
+fn build_claude_command(
+    bin: &PathBuf,
+    args: &[String],
+    cwd: Option<&str>,
+) -> std::process::Command {
+    let mut cmd = crate::hidden_command(bin);
+    cmd.args(args)
+        .env_remove("CLAUDECODE") // prevent "nested session" guard
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
+    cmd
 }
 
 fn format_failed_claude_exit(stderr_output: &str, status: ExitStatus) -> String {
@@ -593,6 +603,9 @@ fn extract_tool_result_text(json: &serde_json::Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsStr;
+    use std::ffi::OsString;
+    use std::process::Command;
 
     #[test]
     fn check_cli_returns_status() {
@@ -906,6 +919,33 @@ mod tests {
 
     // --- run_claude_subprocess with mock scripts ---
 
+    #[test]
+    fn build_claude_command_keeps_streaming_process_contract() {
+        let bin = PathBuf::from("claude");
+        let args = vec!["-p".to_string(), "hello".to_string()];
+        let command = build_claude_command(&bin, &args, Some("/tmp/vault"));
+        let actual_args: Vec<OsString> = command.get_args().map(OsStr::to_os_string).collect();
+        let claude_code_env = command
+            .get_envs()
+            .find(|(key, _)| *key == OsStr::new("CLAUDECODE"))
+            .map(|(_, value)| value.map(OsStr::to_os_string));
+
+        assert_eq!(
+            (
+                command.get_program().to_os_string(),
+                actual_args,
+                command.get_current_dir().map(Path::to_path_buf),
+                claude_code_env,
+            ),
+            (
+                OsString::from("claude"),
+                vec![OsString::from("-p"), OsString::from("hello")],
+                Some(PathBuf::from("/tmp/vault")),
+                Some(None),
+            ),
+        );
+    }
+
     #[cfg(unix)]
     fn run_mock_script(script: &str) -> (Result<String, String>, Vec<ClaudeStreamEvent>) {
         run_mock_script_with_args(script, &[])
@@ -940,6 +980,99 @@ mod tests {
         assert!(matches!(&events[1], ClaudeStreamEvent::TextDelta { text } if text == "Hi"));
         assert!(matches!(&events[2], ClaudeStreamEvent::Result { .. }));
         assert!(matches!(&events[3], ClaudeStreamEvent::Done));
+    }
+
+    #[test]
+    fn run_subprocess_closes_stdin_even_when_parent_stdin_pipe_is_open() {
+        use std::io::Read;
+        use std::time::{Duration, Instant};
+
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .arg("stdin_probe_parent_child")
+            .arg("--ignored")
+            .arg("--nocapture")
+            .env("TOLARIA_STDIN_PROBE_CHILD", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let child_stdin = child.stdin.take().unwrap();
+        let mut stdout = child.stdout.take().unwrap();
+        let mut stderr = child.stderr.take().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+
+        let status = loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                break status;
+            }
+            if Instant::now() >= deadline {
+                child.kill().unwrap();
+                drop(child_stdin);
+                panic!("stdin probe child timed out");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+
+        drop(child_stdin);
+        let mut stdout_text = String::new();
+        let mut stderr_text = String::new();
+        stdout.read_to_string(&mut stdout_text).unwrap();
+        stderr.read_to_string(&mut stderr_text).unwrap();
+
+        assert!(
+            status.success(),
+            "stdin probe child failed with {status}\nstdout:\n{stdout_text}\nstderr:\n{stderr_text}"
+        );
+    }
+
+    #[ignore = "spawned by run_subprocess_closes_stdin_even_when_parent_stdin_pipe_is_open"]
+    #[test]
+    fn stdin_probe_parent_child() {
+        if std::env::var_os("TOLARIA_STDIN_PROBE_CHILD").is_none() {
+            return;
+        }
+
+        let fake_bin = std::env::current_exe().unwrap();
+        let args = vec![
+            "stdin_probe_mock_claude_child".to_string(),
+            "--ignored".to_string(),
+            "--nocapture".to_string(),
+        ];
+        std::env::set_var("TOLARIA_STDIN_PROBE_MOCK_CLAUDE_CHILD", "1");
+        let mut events = vec![];
+        let result = run_claude_subprocess(&fake_bin, &args, None, &mut |event| events.push(event));
+        std::env::remove_var("TOLARIA_STDIN_PROBE_MOCK_CLAUDE_CHILD");
+
+        assert_eq!(result.unwrap(), "stdin-ok");
+        assert!(matches!(
+            events.first(),
+            Some(ClaudeStreamEvent::Result { text, session_id })
+                if text == "stdin closed" && session_id == "stdin-ok"
+        ));
+        assert!(matches!(events.last(), Some(ClaudeStreamEvent::Done)));
+    }
+
+    #[ignore = "spawned by stdin_probe_parent_child"]
+    #[test]
+    fn stdin_probe_mock_claude_child() {
+        if std::env::var_os("TOLARIA_STDIN_PROBE_MOCK_CLAUDE_CHILD").is_none() {
+            return;
+        }
+
+        use std::io::Read;
+
+        let mut stdin = String::new();
+        std::io::stdin().read_to_string(&mut stdin).unwrap();
+        assert!(stdin.is_empty(), "stdin was not EOF");
+        println!(
+            "{}",
+            serde_json::json!({
+                "type": "result",
+                "result": "stdin closed",
+                "session_id": "stdin-ok"
+            })
+        );
     }
 
     #[cfg(unix)]

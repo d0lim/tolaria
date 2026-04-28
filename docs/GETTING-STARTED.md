@@ -106,16 +106,15 @@ tolaria/
 │   │   └── ui/                   # shadcn/ui primitives
 │   │       ├── button.tsx, dialog.tsx, input.tsx, ...
 │   │
-│   ├── hooks/                    # Custom React hooks (~87 files)
+│   ├── hooks/                    # Custom React hooks (~86 files)
 │   │   ├── useVaultLoader.ts     # Loads vault entries + content
 │   │   ├── useVaultSwitcher.ts   # Multi-vault management
 │   │   ├── useVaultConfig.ts     # Per-vault UI settings
 │   │   ├── useNoteActions.ts     # Composes creation + rename + frontmatter
 │   │   ├── useNoteCreation.ts    # Note/type creation
 │   │   ├── useNoteRename.ts     # Note renaming + wikilink updates
-│   │   ├── useAiAgent.ts         # Legacy Claude-specific stream helpers reused by the shared agent hook
-│   │   ├── useCliAiAgent.ts      # Selected AI agent state + normalized tool tracking
-│   │   ├── useAiAgentsStatus.ts  # Claude/Codex availability polling
+│   │   ├── useCliAiAgent.ts      # Selected AI agent state + normalized session pipeline
+│   │   ├── useAiAgentsStatus.ts  # Claude/Codex/OpenCode/Pi availability polling
 │   │   ├── useAiAgentPreferences.ts # Default-agent persistence + cycling
 │   │   ├── useAiActivity.ts      # MCP UI bridge listener
 │   │   ├── useAutoSync.ts        # Auto git pull/push
@@ -191,6 +190,7 @@ tolaria/
 │   │   ├── search.rs             # Keyword search (walkdir-based)
 │   │   ├── ai_agents.rs          # Shared CLI-agent detection + stream adapters
 │   │   ├── claude_cli.rs         # Claude CLI subprocess management
+│   │   ├── pi_cli.rs             # Pi CLI subprocess management
 │   │   ├── mcp.rs                # MCP server lifecycle + explicit config registration/removal
 │   │   ├── app_updater.rs        # Alpha/stable updater endpoint selection
 │   │   ├── settings.rs           # App settings persistence
@@ -261,8 +261,9 @@ tolaria/
 | `src-tauri/src/frontmatter/ops.rs` | YAML manipulation — how properties are updated/deleted in files. |
 | `src-tauri/src/git/` | All git operations (clone, commit, pull, push, conflicts, pulse, add-remote). |
 | `src-tauri/src/search.rs` | Keyword search — scans vault files with walkdir. |
-| `src-tauri/src/ai_agents.rs` | Shared CLI-agent availability checks, safe-default Codex adapter, and stream normalization. |
+| `src-tauri/src/ai_agents.rs` | Shared CLI-agent availability checks, adapter dispatch, and stream normalization. |
 | `src-tauri/src/claude_cli.rs` | Claude CLI subprocess spawning + NDJSON stream parsing. |
+| `src-tauri/src/pi_cli.rs` | Pi subprocess spawning through JSON mode and transient MCP adapter config. |
 | `src-tauri/src/app_updater.rs` | Desktop updater bridge — selects alpha/stable manifests and streams install progress. |
 
 ### Editor
@@ -282,7 +283,9 @@ tolaria/
 | File | Why it matters |
 |------|---------------|
 | `src/components/AiPanel.tsx` | AI agent panel — selected CLI agent with tool execution, reasoning, and actions. |
-| `src/hooks/useCliAiAgent.ts` | Agent state: messages, streaming, tool tracking, file detection. |
+| `src/hooks/useCliAiAgent.ts` | Thin React owner for the selected CLI agent session state. |
+| `src/lib/aiAgentSession.ts` | Single message/session lifecycle for prompt normalization, history, streaming, and reset behavior. |
+| `src/lib/aiAgentFileOperations.ts` | Detects agent-created or modified vault files from normalized tool inputs. |
 | `src/lib/aiAgents.ts` | Supported agent definitions, status normalization, and default-agent helpers. |
 | `src/utils/ai-context.ts` | Context snapshot builder for AI conversations. |
 
@@ -418,4 +421,10 @@ BASE_URL="http://localhost:5173" npx playwright test tests/smoke/<slug>.spec.ts
 2. **Context building**: Edit `src/utils/ai-context.ts` for what data is sent to the agent
 3. **Tool action display**: Edit `src/components/AiActionCard.tsx`
 4. **Claude CLI arguments**: Edit `src-tauri/src/claude_cli.rs` (`run_agent_stream()`; keep app-managed launches on strict Tolaria MCP config, `acceptEdits`, and the scoped file/search tool list)
-5. **Shared agent adapters / Codex args**: Edit `src-tauri/src/ai_agents.rs` (keep Codex sandboxed with active-vault `workspace-write`; do not use the dangerous bypass unless an ADR explicitly designs a new mode)
+5. **Shared agent adapters / Codex/Pi args**: Edit `src-tauri/src/ai_agents.rs` plus the per-agent adapter modules (keep Codex sandboxed with active-vault `workspace-write`, keep Pi on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode)
+
+### Work with external MCP setup
+
+1. **Backend registration/status**: Edit `src-tauri/src/mcp.rs`; registration must verify Node.js first, resolve the packaged `mcp-server/` for macOS, Windows, Linux, and AppImage installs, and write an explicit stdio entry with `VAULT_PATH` plus `WS_UI_PORT=9711`
+2. **Setup dialog copy/actions**: Edit `src/components/McpSetupDialog.tsx`; users should see the Node.js prerequisite and the manual config shape before Tolaria writes third-party config files
+3. **Status hook/toasts**: Edit `src/hooks/useMcpStatus.ts` when setup, reconnect, disconnect, or failure messaging changes

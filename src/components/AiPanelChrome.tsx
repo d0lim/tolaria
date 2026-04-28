@@ -4,13 +4,13 @@ import { AiMessage } from './AiMessage'
 import { WikilinkChatInput } from './WikilinkChatInput'
 import { extractInlineWikilinkReferences } from './inlineWikilinkText'
 import type { AiAgentMessage } from '../hooks/useCliAiAgent'
+import type { AiAgentReadiness } from '../lib/aiAgents'
 import type { NoteReference } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 
 interface AiPanelHeaderProps {
   agentLabel: string
-  agentReady: boolean
-  legacyCopy: boolean
+  agentReadiness: AiAgentReadiness
   onClose: () => void
   onNewChat: () => void
 }
@@ -22,8 +22,7 @@ interface AiPanelContextBarProps {
 
 interface AiPanelMessageHistoryProps {
   agentLabel: string
-  agentReady: boolean
-  legacyCopy: boolean
+  agentReadiness: AiAgentReadiness
   messages: AiAgentMessage[]
   isActive: boolean
   onOpenNote?: (path: string) => void
@@ -34,7 +33,7 @@ interface AiPanelMessageHistoryProps {
 interface AiPanelComposerProps {
   entries: VaultEntry[]
   agentLabel: string
-  agentReady: boolean
+  agentReadiness: AiAgentReadiness
   input: string
   inputRef: React.RefObject<HTMLDivElement | null>
   isActive: boolean
@@ -45,9 +44,13 @@ interface AiPanelComposerProps {
 
 function getComposerPlaceholder(
   agentLabel: string,
-  agentReady: boolean,
+  agentReadiness: AiAgentReadiness,
 ): string {
-  if (!agentReady) {
+  if (agentReadiness === 'checking') {
+    return 'Checking AI agent availability...'
+  }
+
+  if (agentReadiness === 'missing') {
     return `${agentLabel} is not installed. Open AI Agents in Settings.`
   }
 
@@ -56,11 +59,27 @@ function getComposerPlaceholder(
 
 function AiPanelEmptyState({
   agentLabel,
-  agentReady,
+  agentReadiness,
   hasContext,
-  legacyCopy,
-}: Pick<AiPanelMessageHistoryProps, 'agentLabel' | 'agentReady' | 'hasContext' | 'legacyCopy'>) {
-  if (!agentReady) {
+}: Pick<AiPanelMessageHistoryProps, 'agentLabel' | 'agentReadiness' | 'hasContext'>) {
+  if (agentReadiness === 'checking') {
+    return (
+      <div
+        className="flex flex-col items-center justify-center text-center text-muted-foreground"
+        style={{ paddingTop: 40 }}
+      >
+        <Robot size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
+        <p style={{ fontSize: 13, margin: '0 0 4px' }}>
+          Checking AI agent availability
+        </p>
+        <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
+          Messages can be sent when the selected agent is ready
+        </p>
+      </div>
+    )
+  }
+
+  if (agentReadiness === 'missing') {
     return (
       <div
         className="flex flex-col items-center justify-center text-center text-muted-foreground"
@@ -85,8 +104,8 @@ function AiPanelEmptyState({
       <Robot size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
       <p style={{ fontSize: 13, margin: '0 0 4px' }}>
         {hasContext
-          ? legacyCopy ? 'Ask about this note and its linked context' : `Ask ${agentLabel} about this note and its linked context`
-          : legacyCopy ? 'Open a note, then ask the AI about it' : `Open a note, then ask ${agentLabel} about it`
+          ? `Ask ${agentLabel} about this note and its linked context`
+          : `Open a note, then ask ${agentLabel} about it`
         }
       </p>
       <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
@@ -101,8 +120,7 @@ function AiPanelEmptyState({
 
 export function AiPanelHeader({
   agentLabel,
-  agentReady,
-  legacyCopy,
+  agentReadiness,
   onClose,
   onNewChat,
 }: AiPanelHeaderProps) {
@@ -114,14 +132,13 @@ export function AiPanelHeader({
       <Robot size={16} className="shrink-0 text-muted-foreground" />
       <div className="flex flex-1 flex-col overflow-hidden">
         <span className="text-muted-foreground" style={{ fontSize: 13, fontWeight: 600 }}>
-          {legacyCopy ? 'AI Chat' : 'AI Agent'}
+          AI Agent
         </span>
-        {!legacyCopy && (
-          <span className="truncate text-[11px] text-muted-foreground">
-            {agentLabel}
-            {!agentReady ? ' · not installed' : ''}
-          </span>
-        )}
+        <span className="truncate text-[11px] text-muted-foreground">
+          {agentReadiness === 'checking'
+            ? 'Checking availability'
+            : `${agentLabel}${agentReadiness === 'missing' ? ' · not installed' : ''}`}
+        </span>
       </div>
       <button
         className="shrink-0 border-none bg-transparent p-1 text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
@@ -160,8 +177,7 @@ export function AiPanelContextBar({ activeEntry, linkedCount }: AiPanelContextBa
 
 export function AiPanelMessageHistory({
   agentLabel,
-  agentReady,
-  legacyCopy,
+  agentReadiness,
   messages,
   isActive,
   onOpenNote,
@@ -179,8 +195,7 @@ export function AiPanelMessageHistory({
       {messages.length === 0 && !isActive && (
         <AiPanelEmptyState
           agentLabel={agentLabel}
-          agentReady={agentReady}
-          legacyCopy={legacyCopy}
+          agentReadiness={agentReadiness}
           hasContext={hasContext}
         />
       )}
@@ -200,7 +215,7 @@ export function AiPanelMessageHistory({
 export function AiPanelComposer({
   entries,
   agentLabel,
-  agentReady,
+  agentReadiness,
   input,
   inputRef,
   isActive,
@@ -208,9 +223,9 @@ export function AiPanelComposer({
   onSend,
   onUnsupportedAiPaste,
 }: AiPanelComposerProps) {
-  const composerDisabled = isActive || !agentReady
+  const composerDisabled = isActive || agentReadiness !== 'ready'
   const canSend = !composerDisabled && input.trim().length > 0
-  const placeholder = getComposerPlaceholder(agentLabel, agentReady)
+  const placeholder = getComposerPlaceholder(agentLabel, agentReadiness)
   const sendButtonStyle = {
     background: canSend ? 'var(--primary)' : 'var(--muted)',
     color: canSend ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
